@@ -10,7 +10,7 @@ print(session.client("sts").get_caller_identity())
 
 **Run**
 ```bash
-python main.py
+python step1.py
 ```
 
 **Output**
@@ -35,7 +35,7 @@ python main.py
 ## Step 2 - Running with junk env vars
 
 ```bash
-AWS_ACCESS_KEY_ID=AKIABOGUS000000000 AWS_SECRET_ACCESS_KEY=nope python main.py
+AWS_ACCESS_KEY_ID=AKIABOGUS000000000 AWS_SECRET_ACCESS_KEY=nope python script1.py
 ```
 
 **Output**
@@ -51,4 +51,62 @@ AWS_ACCESS_KEY_ID=AKIABOGUS000000000 AWS_SECRET_ACCESS_KEY=nope python main.py
   File "/Users/felipefaria/Playgroung/aws-playground/POC-2/venv/lib/python3.14/site-packages/botocore/client.py", line 1094, in _make_api_call
     raise error_class(parsed_response, operation_name)
 botocore.exceptions.ClientError: An error occurred (InvalidClientTokenId) when calling the GetCallerIdentity operation: The security token included in the request is invalid.
+```
+
+## Step 3 - Uploading a file
+
+**Code**
+```python
+import boto3
+
+session = boto3.Session()
+
+creds = session.get_credentials()
+print("provider:", creds.method)
+print(session.client("sts").get_caller_identity()["Arn"])
+
+s3 = session.client("s3")
+
+# list
+for b in s3.list_buckets()["Buckets"]:
+    print(" ", b["Name"])
+
+# upload
+s3.put_object(Bucket="YOUR-BUCKET", Key="poc/hello.txt", Body=b"hello\n")
+print("uploaded")
+```
+
+**Run**
+```bash
+python script2.py
+```
+
+**Output**
+```bash
+provider: shared-credentials-file
+arn:aws:iam::536260290699:user/felipe-admin
+  creds-poc-1787281630-felipe
+  poc-iam-felipefaria-01
+uploaded
+```
+
+## Step 4 - Reusable function
+
+**Output**
+```bash
+--- default chain ---
+provider: shared-credentials-file
+arn     : arn:aws:iam::536260290699:user/felipe-admin
+buckets : 2
+uploaded
+
+--- explicit profile ---
+provider: shared-credentials-file
+arn     : arn:aws:iam::330890114384:user/felipevisu
+buckets : 4
+FAILED: AccessDenied
+
+--- hardcoded junk ---
+provider: explicit
+FAILED: InvalidClientTokenId
 ```
