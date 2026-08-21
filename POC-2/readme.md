@@ -110,3 +110,57 @@ FAILED: AccessDenied
 provider: explicit
 FAILED: InvalidClientTokenId
 ```
+## Step 5 - Assume role
+
+Role `POC2` trusts `felipe-admin` and has only `AmazonS3ReadOnlyAccess` attached.
+
+**Code**
+```python
+ROLE_ARN = "arn:aws:iam::536260290699:role/POC2"
+
+base = boto3.Session(profile_name="felipe")
+
+resp = base.client("sts").assume_role(
+    RoleArn=ROLE_ARN,
+    RoleSessionName="poc",
+    DurationSeconds=900,
+)
+c = resp["Credentials"]
+print("\nexpires:", c["Expiration"])
+
+assumed = boto3.Session(
+    aws_access_key_id=c["AccessKeyId"],
+    aws_secret_access_key=c["SecretAccessKey"],
+    aws_session_token=c["SessionToken"],
+)
+
+run(base, "base identity")
+run(assumed, "assumed role")
+```
+
+**Run**
+```bash
+python script4.py
+```
+
+**Output**
+```bash
+expires: 2026-08-21 13:12:36+00:00
+
+--- base identity ---
+provider: shared-credentials-file
+arn     : arn:aws:iam::536260290699:user/felipe-admin
+buckets : 2
+uploaded
+
+--- assumed role ---
+provider: explicit
+arn     : arn:aws:sts::536260290699:assumed-role/POC2/poc
+buckets : 2
+FAILED: AccessDenied
+```
+
+**Notes**
+- `assume_role` returns temporary creds (15 min here) — note the `SessionToken`, absent from the long-lived user keys.
+- Identity changes: `user/felipe-admin` → `assumed-role/POC2/poc`. Same account, different permissions.
+- `list_buckets` works, `put_object` fails: role policy is read-only (`Get*`/`List*`), no `s3:PutObject`. Least privilege in action — the admin user can write, the role it assumed cannot.
